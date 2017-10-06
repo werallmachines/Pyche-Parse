@@ -117,5 +117,4 @@ if __name__ == "__main__":
     pycheparse = Pycheparse()
     parse_cmdline()
     pycheparse.parse_log(pycheparse.open_log())
-    print(lines)
     pycheparse.pyche_print()
