@@ -60,9 +60,6 @@ class Pycheparse:
         Parse the log file after the necessary lines extracted
         '''
         if values['time']:
-            #if short_time:
-                #values['time'] = re.findall(r'\[\w\w\w\s([\w\s:]+).[\d]+\s(20\d\d)', str(log))
-            #else:
             values['time'] = re.findall(r'\[([\w\s.:]+20\d\d)]', str(log))
         if values['module']:
             values['module'] = re.findall(r'20\d\d]\s\[([\w:]+)\]\s\[pid', str(log))
