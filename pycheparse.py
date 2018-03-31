@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 
@@ -17,104 +17,103 @@ logs as well as error, and output to file.
 - only CLI for now. Eventually to include a GUI.
 '''
 
-import collections
-import argparse
-import sys
-import os
-import re
+import argparse, collections, os, re, sys
 
-path = '' #log location
-lines = 10 #lines to display
+path = '' # path to error log
+lines = 0 # lines to display
 short_time = False
+default = False
 values = collections.OrderedDict()
-values['time'] = ''; values['module'] = ''; values['pid'] = ''; values['client'] = ''; values['error'] = ''
+regex = {}
+wrapper = [values, regex]
 
-class Pycheparse:
-    def __init__(self):
-        pass
+def open_log():
+	"Find and open the log file first"
+	if os.path.exists(path): # determine if path exists
+		try:
+			log_file = open(path).readlines()
+			if len(log_file) == 0:
+				print("FIle is empty.")
+				sys.exit(0)
+			elif len(log_file) < lines: # if file is shorter than lines
+				return log_file
+			else:
+				slice_bound = len(log_file) - lines # display last n lines
+				log_file = log_file[slice_bound:]
+				return log_file
+		except IOError:
+			print(IOError)
+			sys.exit(1)
+	else:
+		print("Path doesn't exist. Please check the path and try again.")
 
-    def open_log(self):
-        '''
-        Find and open the log file first
-        '''
-        if os.path.exists(path): #first determine if the user given path exists
-            try:
-                logf = open(path).readlines()
-                if len(logf) == 0: #pyche parse won't wont work an empty file
-                    print("File is empty. Please choose file with content.")
-                    sys.exit(1)
-                elif len(logf) < lines: #if log file is shorter than requested lines, display whole log file
-                    return logf
-                else:
-                    slice_bound = len(logf) - lines #display the last n number of lines
-                    log = logf[slice_bound:]
-                    return log
-            except OSError: #in case of permissions issue
-                print(OSError)
-                sys.exit(1)
-        else:
-            print("Given path does not exist. Check path and try again.")
+def fill_in_values(log_file):
+	"Fill in the dictionary to get ready to print"
+	if default:
+		for key in values:
+			values[key] = init_regex(key, log_file)
+	else:
+		for key in values:
+			if key:
+				values[key] = init_regex(key, log_file)
 
-    def parse_log(self, log):
-        '''
-        Parse the log file after the necessary lines extracted
-        '''
-        if values['time']:
-            values['time'] = re.findall(r'\[([\w\s.:]+20\d\d)]', str(log))
-        if values['module']:
-            values['module'] = re.findall(r'20\d\d]\s\[([\w:]+)\]\s\[pid', str(log))
-        if values['pid']:
-            values['pid'] = re.findall(r'\[(pid\s[\w]+)\]', str(log))
-        if values['client']:
-            values['client'] = re.findall(r'\[(client\s[\w.:]*)\]', str(log))
-        if values['error']:
-            values['error'] = re.findall(r'\]\s([AH\w\s]*:\s*[\w\s\^\-.,\'":=#<>/\(\)\[\]]*)\\n', str(log))
-
-    def pyche_print(self):
-        '''
-        Display the Apache log to the user
-        '''
-        #first prepare the display string
-        display_string = "==> " #string we'll be printing
-        zipped_values = zip(*(values[key] for key in values if values[key])) #take the dictionary values and pair them
-        for val in range(len(zipped_values[0])): #format display string
-            if val != range(len(zipped_values[0]))[-1]:
-                display_string += "{" + str(val) + "} | "
-            else:
-                display_string += "{" + str(val) + "}"
-        #remove entries from the zipped list, add to format method and print
-        for entry in range(len(zipped_values)):
-            popped = zipped_values.pop(0)
-            print(display_string.format(*popped))
+def pyche_print():
+	"Display the Apache log file to the user"
+	display_string = '====> ' # this will be the format method
+	zipped_values = list(zip(*(values[key] for key in values if values[key]))) # pair values together
+	for val in range(len(zipped_values[0])): # prepare the format method
+		if val != range(len(zipped_values[0]))[-1]: # check if last item in pairing
+			display_string += '{' + str(val) + '} | '
+		else:
+			display_string += '{' + str(val) + '}' # if last item, format appropriately
+	for entry in range(len(zipped_values)): 
+		popped = zipped_values.pop(0) # pop out each pairing
+		print(display_string.format(*popped)) # unpack into format method positionally
 
 def parse_cmdline():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('path', help="Path to Apache2 log file")
-    parser.add_argument('-l', '--lines', type=int, help="How many lines to view")
-    parser.add_argument('-s', '--shorttime', action="store_true", help="Display time without day or seconds")
-    parser.add_argument('-t', '--time', action="store_true", help="Convert militarytime to standard time")
-    parser.add_argument('-m', '--module', action="store_true", help="Include module value")
-    parser.add_argument('-p', '--pid', action="store_true", help="Include PID value")
-    parser.add_argument('-c', '--client', action="store_true", help="Include client value")
-    parser.add_argument('-e', '--error', action="store_true", help="Include error identification value")
-    args = parser.parse_args()
+	parser = argparse.ArgumentParser()
+	parser.add_argument('path', help='Path to Apache2 file')
+	parser.add_argument('-l', '--lines', type=int, help='How many lines to view')
+	parser.add_argument('-d', '--default', action='store_true', default=False, help='Include default values')
+	parser.add_argument('-t', '--time', action='store_true', help='Convert military time to standard time')
+	parser.add_argument('-m', '--module', action='store_true', help='Include module value')
+	parser.add_argument('-s', '--severity', action='store_true', help='Include severity value')
+	parser.add_argument('-p', '--pid', action='store_true', help='Include PID value')
+	parser.add_argument('-c', '--client', action='store_true', help='Include client value')
+	parser.add_argument('-e', '--error', action='store_true', help='Include error identification value')
+	args = parser.parse_args()
 
-    global path
-    global lines
-    global short_time
+	global path
+	global lines
+	global values
+	global default
 
-    path = args.path
-    lines = args.lines
-    short_time = args.shorttime
+	path = args.path
+	lines = args.lines if args.lines else 10
 
-    values['time'] = args.time
-    values['module'] = args.module
-    values['pid'] = args.pid
-    values['client'] = args.client
-    values['error'] = args.error
+	default = args.default
+	values['severity'] = args.severity
+	values['time'] = args.time
+	values['module'] = args.module
+	values['pid'] = args.pid
+	values['client'] = args.client
+	values['error'] = args.error
 
-if __name__ == "__main__":
-    pycheparse = Pycheparse()
-    parse_cmdline()
-    pycheparse.parse_log(pycheparse.open_log())
-    pycheparse.pyche_print()
+def init_regex(key, log_file):
+	"Perform pattern matching"
+	regex['time'] = re.findall(r'\[([\w\s.:]+20\d\d)]', str(log_file))
+	regex['module'] = re.findall(r'20\d\d]\s\[([\w]+):\w+\]\s\[pid', str(log_file))
+	regex['severity'] = re.findall(r'20\d\d]\s\[[\w]+:([\w]+)]\s\[pid', str(log_file))
+	regex['pid'] = re.findall(r'\[(pid\s[\w]+)\]', str(log_file))
+	regex['client'] = re.findall(r'\[(client\s[\w.:]*)\]', str(log_file))
+	regex['error'] = re.findall(r'\]\s([AH\w\s]*:\s*[\w\s\^\-.,\'":=#<>/\(\)\[\]]*)\\n', str(log_file))
+
+	return regex[key]
+
+if __name__ == '__main__':
+	parse_cmdline()
+	parse_logfile(open_log())
+	pyche_print()
+
+
+
